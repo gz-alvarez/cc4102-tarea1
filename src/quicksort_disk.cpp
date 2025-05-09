@@ -87,7 +87,7 @@ void quicksort_disk(DiskArray<uint64_t> &bin) {
 			for (size_t j = 0; j < sorted_subarray.size(); j++) {	
 				std::vector<uint64_t> block = sorted_subarray[j];
 				for (size_t k = 0; k < block.size(); k++) {
-					std::vector<uint64_t>& vec_block = bin[block_id];
+					std::vector<uint64_t> vec_block = bin[block_id];
 					if (pos < vec_block.size()) {
 						vec_block[pos] = block[k];
 						pos++;
