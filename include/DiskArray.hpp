@@ -4,6 +4,7 @@
 #include <fstream>
 #include <print>
 #include <vector>
+#include <filesystem>
 
 #include <fs_block.hpp>
 
