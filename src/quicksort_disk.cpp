@@ -4,8 +4,10 @@
 #include <fstream>
 #include <cstdlib>
 #include <set>  
+#include <iostream>
 
 
+const size_t M = 50 * 1024 * 1024;
 void quicksort_disk(DiskArray<uint64_t> &bin) {
 	size_t N = bin.size() * B_bytes / sizeof(uint64_t);
 	if (N <= M) {
@@ -20,7 +22,9 @@ void quicksort_disk(DiskArray<uint64_t> &bin) {
 		std::sort(arr.begin(), arr.end()); 
 
 		for (size_t block_idx=0; block_idx<bin.size(); block_idx++) {
-			std::vector<uint64_t> block(arr.begin()+block_idx*B_bytes/sizeof(uint64_t), arr.end()+block_idx*B_bytes/sizeof(uint64_t));
+			size_t start = block_idx * B_bytes / sizeof(uint64_t);
+			size_t end = std::min(start + B_bytes / sizeof(uint64_t), arr.size());
+			std::vector<uint64_t> block(arr.begin() + start, arr.begin() + end);
 			bin[block_idx] = block;
 		}
 	}
@@ -41,8 +45,9 @@ void quicksort_disk(DiskArray<uint64_t> &bin) {
 				random_id = std::rand() % block_size;
 			} while (ids.find(random_id) != ids.end());
 			ids.insert(random_id);
-			pivots.push_back(block_random[random_id])
+			pivots.push_back(block_random[random_id]);
 		}
+	
 		// ordena los pivotes
 		std::sort(pivots.begin(), pivots.end());
 
@@ -59,24 +64,42 @@ void quicksort_disk(DiskArray<uint64_t> &bin) {
 		}
 
 		//llamado recursivo a quicksort
+
+		std::vector<std::string> files(subarrays.size());
+		std::vector<DiskArray<uint64_t>> sorted_array;
+		std::vector<int> nums;
+
 		for (size_t i = 0; i < subarrays.size(); i++){
-			DiskArray<uint64_t> subarray_disk(subarrays[i]);
-			quicksort_disk(subarray_disk);
+			files[i] = "file_" + std::to_string(i) + ".bin";
+			std::ofstream out(files[i], std::ios::binary);
+			out.write(reinterpret_cast<char*>(subarrays[i].data()), subarrays[i].size() * sizeof(uint64_t));
+			out.close();
+			sorted_array.push_back(DiskArray<uint64_t>(files[i], block_size)); 
+			quicksort_disk(sorted_array[i]);
 		}
 
 		//concatenar los subarreglos
 		size_t block_id = 0;
 		size_t pos = 0;
 		
-		for (size_t subarray_idx = 0; subarray_idx < subarrays.size(); subarray_idx++) {
-			std::vector<uint64_t>& subarray = subarrays[subarray_idx];
-			for (size_t subarray_element_idx = 0; subarray_element_idx < subarray.size(); subarray_element_idx++) {
-				uint64_t val = subarray[subarray_element_idx];
-				bin[block_id][pos] = val;
-				pos++;
-				if(pos == block_size){
-					block_id++;
-					pos = 0;
+		for (size_t i = 0; i < sorted_array.size(); i++) {
+			DiskArray<uint64_t>& sorted_subarray = sorted_array[i];
+			for (size_t j = 0; j < sorted_subarray.size(); j++) {	
+				std::vector<uint64_t> block = sorted_subarray[j];
+				for (size_t k = 0; k < block.size(); k++) {
+					std::vector<uint64_t> vec_block = bin[block_id];
+					if (pos < vec_block.size()) {
+						vec_block[pos] = block[k];
+						pos++;
+					} else {
+						block_id++;
+						pos = 0;
+						if (block_id < bin.size()) {
+							vec_block = bin[block_id];
+							vec_block[pos] = block[k];
+							pos++;
+						}
+					}
 				}
 			}
 		}
