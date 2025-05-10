@@ -13,6 +13,8 @@ Clase que representa un archivo en disco de tamaño n bloques, donde cada bloque
 */
 template <typename T>
 class DiskArray {
+	std::filesystem::path path;
+	bool temp;
 	std::fstream stream;
 	const size_t size_blocks;
 	unsigned int stat_read = 0;
@@ -47,9 +49,12 @@ class DiskArray {
 	};
 
 	public:
-	DiskArray(std::filesystem::path path, size_t size_blocks): size_blocks(size_blocks) {
+	DiskArray(std::filesystem::path path, size_t size_blocks, bool temp = false): path(path), size_blocks(size_blocks), temp(temp) {
 		stream.open(path, std::ios::out | std::ios::in | std::ios::trunc);
 		if (not stream.is_open()) throw std::runtime_error(std::format("Failed to open file {}", path.string()));
+	}
+	~DiskArray() {
+		if (temp) std::filesystem::remove(path); // eliminar archivo temportal
 	}
 	Block operator[](int index) {
 		if (index >= size_blocks) {
