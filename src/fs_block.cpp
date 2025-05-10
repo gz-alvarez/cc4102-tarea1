@@ -1,7 +1,7 @@
 #include <fs_block.hpp>
 
 
-size_t B_bytes(fetch_fs_block_size());
+size_t B_bytes(4096);
 
 
 size_t fetch_fs_block_size() {
