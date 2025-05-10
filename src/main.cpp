@@ -11,6 +11,7 @@
 #include <fs_block.hpp>
 #include <quicksort_disk.hpp>
 #include <mergesort_disk.hpp>
+#include <constrained_memory.hpp>
 
 
 std::random_device rd;
@@ -32,16 +33,12 @@ struct ExperimentResult {
 };
 
 
-void quicksort_disk(DiskArray<uint64_t>& bin);
-void mergesort_disk(DiskArray<uint64_t>& bin);
-
-
-ExperimentResult experiment(int N_megabytes) {
+ExperimentResult experiment(int N_megabytes, unsigned int arity) {
 	// Primero, vemos la cantidad de bloques necesitados para N_megabytes: ceil(n)
 	// La cantidad de elementos a utilizar corresponderá a ceil(n) en vez de solo n,
 	// es decir, solo trabajaremos con bloques completos para simplificar la implementación
 	int N_bytes = N_megabytes * 1'000'000;
-	size_t size_blocks = N_bytes / B_bytes + (N_bytes % B_bytes != 0); // ceil(n)
+	size_t size_blocks = ceil((float)N_bytes / B_bytes); // ceil(n)
 	std::println("Experiment for N = {}MB => n = {} blocks, for a total of {}MB", N_megabytes, size_blocks, size_blocks*B_bytes/1'000'000.0);
 
 	// Iniciar generador para este conjunto de números con semilla aleatoria
@@ -75,7 +72,7 @@ ExperimentResult experiment(int N_megabytes) {
 	unsigned int ms_reads_old = ms_bin.reads();
 	unsigned int ms_writes_old = ms_bin.writes();
 	auto ms_begin = std::chrono::steady_clock::now();
-	mergesort_disk(ms_bin);
+	mergesort_disk(ms_bin, arity);
 	auto ms_time = std::chrono::duration_cast<time_unit>(std::chrono::steady_clock::now() - ms_begin);
 	unsigned int ms_reads = ms_bin.reads() - ms_reads_old;
 	unsigned int ms_writes = ms_bin.writes() - ms_writes_old;
@@ -100,6 +97,44 @@ ExperimentResult experiment(int N_megabytes) {
 }
 
 
+unsigned int compute_a() {
+	size_t size_blocks = ceil(60.0 * M_megabytes * 1'000'000.0 / B_bytes); // 60M megabytes -> bloques
+	size_t b = B_bytes / sizeof(uint64_t);
+	std::pair<size_t, size_t> abounds(2, b);
+	while (abounds.second - abounds.first >= 2) {
+		std::println("Bounds: {}", abounds);
+		auto seed = rd();
+		std::mt19937_64 rng(seed);
+		DiskArray<uint64_t> mbin1("msort_arity_1.tmp.bin", size_blocks, true);
+		DiskArray<uint64_t> mbin2("msort_arity_2.tmp.bin", size_blocks, true);
+		for (size_t block_i=0; block_i<size_blocks; block_i++) {
+			// llenar archivos al azar
+			std::vector<uint64_t> buffer(B_bytes / sizeof(uint64_t));
+			std::generate(buffer.begin(), buffer.end(), std::ref(rng));
+			// escribir el arreglo a los archivos
+			mbin1[block_i] = buffer;
+			mbin2[block_i] = buffer;
+		}
+		size_t m1 = abounds.first + (abounds.second - abounds.first) / 3;
+		size_t m2 = abounds.first + (abounds.second - abounds.first) * (2.0 / 3.0);
+		// ordenar y comparar IOs
+		auto tmp_ios_1 = mergesort_disk(mbin1, m1);
+		std::println("m1: {}, tmp_ios_1: {}", m1, tmp_ios_1);
+		auto tmp_ios_2 = mergesort_disk(mbin2, m2);
+		std::println("m2: {}, tmp_ios_2: {}", m2, tmp_ios_2);
+		unsigned int ios_total_1 = tmp_ios_1.first + tmp_ios_1.second + mbin1.reads() + mbin1.writes();
+		unsigned int ios_total_2 = tmp_ios_2.first + tmp_ios_2.second + mbin2.reads() + mbin2.writes();
+		if (ios_total_1 < ios_total_2) {
+			abounds = std::make_pair(abounds.first, m2);
+		} else {
+			abounds = std::make_pair(m1, abounds.second);
+		}
+	}
+
+	return (abounds.second - abounds.first) / 2;
+}
+
+
 int main(int, char**){
 	/*
 	Se deberá generar 5 secuencias de números enteros de 64 bits de tamaño total 𝑁 , con
@@ -117,12 +152,16 @@ int main(int, char**){
 	for (int i=0; i<=N_count; i++) {
 		N_list_megabytes[i] = 4 * (i+1) * M_megabytes;
 	}
-
 	std::println("Using N[MB] = {}", N_list_megabytes);
+
+	std::println("Computing arity...");
+	unsigned int arity = compute_a();
+	std::println("Decided on a = {}", arity);
+
 	std::println("Starting experiments");
 	for (auto N_megabytes : N_list_megabytes) {
 		for (int repeat=0; repeat<REPEAT_COUNT; repeat++) {
-			auto result = experiment(N_megabytes);
+			auto result = experiment(N_megabytes, arity);
 		}
 	}
 }

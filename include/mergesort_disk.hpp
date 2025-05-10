@@ -2,11 +2,12 @@
 #define MERGESORT_DISK_HPP
 
 #include <cstdint>
+#include <utility>
 
 #include <DiskArray.hpp>
 
 
-void mergesort_disk(DiskArray<uint64_t>& bin);
+std::pair<unsigned, unsigned> mergesort_disk(DiskArray<uint64_t>& bin, unsigned int arity);
 
 
 #endif
