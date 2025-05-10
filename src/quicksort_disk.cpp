@@ -1,5 +1,7 @@
 #include "quicksort_disk.hpp"
 
+#include <constrained_memory.hpp>
+
 #include <algorithm>
 #include <fstream>
 #include <cstdlib>
@@ -7,10 +9,9 @@
 #include <iostream>
 
 
-const size_t M = 50 * 1024 * 1024;
 void quicksort_disk(DiskArray<uint64_t> &bin) {
-	size_t N = bin.size() * B_bytes / sizeof(uint64_t);
-	if (N <= M) {
+	size_t N_bytes = bin.size() * B_bytes;
+	if (N_bytes <= M_bytes) {
 		//se ordena el arreglo en mem principal
 		std::vector<uint64_t> arr;
 
