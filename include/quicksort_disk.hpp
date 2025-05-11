@@ -3,10 +3,10 @@
 
 #include <cstdint>
 
-#include <DiskArray.hpp>
+#include <DiskArrayQ.hpp>
 
 
-void quicksort_disk(DiskArray<uint64_t>& bin);
+void quicksort_disk(DiskArrayQ<uint64_t>& bin);
 
 
 #endif

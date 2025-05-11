@@ -6,7 +6,8 @@
 #include <chrono>
 #include <print>
 #include <functional>
-
+#include <iostream>
+#include <DiskArrayQ.hpp>
 #include <DiskArray.hpp>
 #include <fs_block.hpp>
 #include <quicksort_disk.hpp>
@@ -37,7 +38,7 @@ ExperimentResult experiment(int N_megabytes, unsigned int arity) {
 	// Primero, vemos la cantidad de bloques necesitados para N_megabytes: ceil(n)
 	// La cantidad de elementos a utilizar corresponderá a ceil(n) en vez de solo n,
 	// es decir, solo trabajaremos con bloques completos para simplificar la implementación
-	int N_bytes = N_megabytes * 1'000'000;
+	uint64_t N_bytes = (uint64_t)N_megabytes * 1'000'000;
 	size_t size_blocks = ceil((float)N_bytes / B_bytes); // ceil(n)
 	std::println("Experiment for N = {}MB => n = {} blocks, for a total of {}MB", N_megabytes, size_blocks, size_blocks*B_bytes/1'000'000.0);
 
@@ -143,7 +144,6 @@ int main(int, char**){
 	binario, se tendrá que realizar lo siguiente
 	*/
 
-	constexpr int M_megabytes = 1;
 	std::println("Using M[MB] = {}", M_megabytes);
 	constexpr int REPEAT_COUNT = 5;
 

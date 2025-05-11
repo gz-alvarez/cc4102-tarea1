@@ -9,7 +9,7 @@
 #include <iostream>
 
 
-void quicksort_disk(DiskArray<uint64_t> &bin) {
+void quicksort_disk(DiskArrayQ<uint64_t> &bin) {
 	size_t N_bytes = bin.size() * B_bytes;
 	if (N_bytes <= M_bytes) {
 		//se ordena el arreglo en mem principal
@@ -31,78 +31,76 @@ void quicksort_disk(DiskArray<uint64_t> &bin) {
 	}
 	else {
 		//leer bloque aleatorio
-		size_t block_id_random = std::rand() % bin.size();
-		std::vector<uint64_t> block_random = bin[block_id_random];
-
-		size_t a = 10; //falta definir a (se necesita haber implementado mergesort externo)
-		size_t block_size = block_random.size();
+		size_t a = 62; 
 		std::vector<uint64_t> pivots;
-		std::set<size_t> ids;
+		std::set<uint64_t> ids;
 
-		for(size_t i = 0; i < a - 1; i++){
-			size_t random_id;
-			//evita que se repita el id al elegir al azar
-			do {
-				random_id = std::rand() % block_size;
-			} while (ids.find(random_id) != ids.end());
-			ids.insert(random_id);
-			pivots.push_back(block_random[random_id]);
+		size_t total_elements = bin.size() * (B_bytes / sizeof(uint64_t));
+		size_t n_pivots = a - 1;
+		while (pivots.size() < n_pivots) {
+			size_t block_id = std::rand() % bin.size();
+			std::vector<uint64_t> block = bin[block_id];
+			size_t idx = std::rand() % block.size();
+			uint64_t val = block[idx];
+			if (ids.insert(val).second) {
+				pivots.push_back(val);
+			}
 		}
-	
 		// ordena los pivotes
 		std::sort(pivots.begin(), pivots.end());
 
 		// particionar en subarreglos
-		std::vector<std::vector<uint64_t>> subarrays(a);
+		std::vector<std::string> t_files(a);
+		std::vector<std::ofstream> t_streams(a);
 
-		for (size_t i = 0; i < block_size; i++){
-			uint64_t val = block_random[i];
-			size_t part_id = 0;
-			while(part_id < pivots.size() && val > pivots[part_id]){
-				part_id++;
-			}
-			subarrays[part_id].push_back(val);
+		for (size_t i = 0; i < a; i++) {
+			t_files[i] = "t_" + std::to_string(i) + ".bin";
+			t_streams[i].open(t_files[i], std::ios::binary);
 		}
 
+		for (size_t block_id = 0; block_id < bin.size(); block_id++) {
+			std::vector<uint64_t> block = bin[block_id];
+			for (uint64_t val : block) {
+				size_t part_id = 0;
+				while (part_id < pivots.size() && val > pivots[part_id]) {
+					part_id++;
+				}
+				t_streams[part_id].write(reinterpret_cast<char*>(&val), sizeof(uint64_t));
+			}
+		}
+
+		for (auto &stream : t_streams) stream.close();
+
 		//llamado recursivo a quicksort
-
-		std::vector<std::string> files(subarrays.size());
-		std::vector<DiskArray<uint64_t>> sorted_array;
-		std::vector<int> nums;
-
-		for (size_t i = 0; i < subarrays.size(); i++){
-			files[i] = "file_" + std::to_string(i) + ".bin";
-			std::ofstream out(files[i], std::ios::binary);
-			out.write(reinterpret_cast<char*>(subarrays[i].data()), subarrays[i].size() * sizeof(uint64_t));
-			out.close();
-			sorted_array.push_back(DiskArray<uint64_t>(files[i], block_size)); 
-			quicksort_disk(sorted_array[i]);
+		std::vector<DiskArrayQ<uint64_t>> sorted_arrays;
+		for (const auto &file : t_files) {
+			DiskArrayQ<uint64_t> subarray(file, B_bytes / sizeof(uint64_t));
+			quicksort_disk(subarray);
+			sorted_arrays.push_back(std::move(subarray));
 		}
 
 		//concatenar los subarreglos
 		size_t block_id = 0;
 		size_t pos = 0;
-		std::vector<uint64_t> vec_block = bin[block_id];
+		std::vector<uint64_t> vec_block(B_bytes / sizeof(uint64_t));
 
-		for (size_t i = 0; i < sorted_array.size(); i++) {
-			DiskArray<uint64_t>& sorted_subarray = sorted_array[i];
-			for (size_t j = 0; j < sorted_subarray.size(); j++) {	
-				std::vector<uint64_t> block = sorted_subarray[j];
-				for (size_t k = 0; k < block.size(); k++) {
-					if (pos < vec_block.size()) {
-						vec_block[pos] = block[k];
-						pos++;
-						} else {
-							bin[block_id] = vec_block;        
-							block_id++;
-							pos = 0;
-							vec_block = bin[block_id];     
-							vec_block[pos] = block[k];
-							pos++;
-						}
+		for (const auto &subarray : sorted_arrays) {
+			for (size_t i = 0; i < subarray.size(); i++) {
+				std::vector<uint64_t> block = subarray[i];
+				for (uint64_t val : block) {
+					if (pos == vec_block.size()) {
+						bin[block_id] = vec_block;
+						block_id++;
+						vec_block.resize(B_bytes / sizeof(uint64_t));
+						pos = 0;
+					}
+					vec_block[pos] = val;
+					pos++;
 				}
 			}
 		}
-		bin[block_id] = vec_block; 
+		if (pos > 0) {
+			bin[block_id] = vec_block;
+		}
 	}
 }
