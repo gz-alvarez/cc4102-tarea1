@@ -47,7 +47,7 @@ ExperimentResult experiment(int N_megabytes, unsigned int arity) {
 	std::mt19937_64 rng(seed);
 	
 	// Crear los archivo binarios en los que se trabajará
-	DiskArray<uint64_t> qs_bin("sequenceQS.bin", size_blocks);
+	DiskArrayQ<uint64_t> qs_bin("sequenceQS.bin", size_blocks);
 	DiskArray<uint64_t> ms_bin("sequenceMS.bin", size_blocks);
 
 	// Insertar los n bloques
@@ -103,7 +103,7 @@ unsigned int compute_a() {
 	size_t b = B_bytes / sizeof(uint64_t);
 	std::pair<size_t, size_t> abounds(2, b);
 	while (abounds.second - abounds.first >= 2) {
-		std::println("Bounds: {}", abounds);
+		std::println("Bounds: ({}, {})", abounds.first, abounds.second);
 		auto seed = rd();
 		std::mt19937_64 rng(seed);
 		DiskArray<uint64_t> mbin1("msort_arity_1.tmp.bin", size_blocks, true);
@@ -120,9 +120,9 @@ unsigned int compute_a() {
 		size_t m2 = abounds.first + (abounds.second - abounds.first) * (2.0 / 3.0);
 		// ordenar y comparar IOs
 		auto tmp_ios_1 = mergesort_disk(mbin1, m1);
-		std::println("m1: {}, tmp_ios_1: {}", m1, tmp_ios_1);
+		std::println("m1: {}, tmp_ios_1: ({}, {})", m1, tmp_ios_1.first, tmp_ios_1.second);
 		auto tmp_ios_2 = mergesort_disk(mbin2, m2);
-		std::println("m2: {}, tmp_ios_2: {}", m2, tmp_ios_2);
+		std::println("m2: {}, tmp_ios_2: ({}, {})", m2, tmp_ios_2.first, tmp_ios_2.second);
 		unsigned int ios_total_1 = tmp_ios_1.first + tmp_ios_1.second + mbin1.reads() + mbin1.writes();
 		unsigned int ios_total_2 = tmp_ios_2.first + tmp_ios_2.second + mbin2.reads() + mbin2.writes();
 		if (ios_total_1 < ios_total_2) {
@@ -152,10 +152,17 @@ int main(int, char**){
 	for (int i=0; i<=N_count; i++) {
 		N_list_megabytes[i] = 4 * (i+1) * M_megabytes;
 	}
-	std::println("Using N[MB] = {}", N_list_megabytes);
-
-	std::println("Computing arity...");
-	unsigned int arity = compute_a();
+	std::println("Using N[MB] = {{"); 
+	for (int i = 0; i < N_count; i++) {
+		std::println("{}", N_list_megabytes[i]);
+		if (i < N_count - 1) {
+			std::cout << ", ";  
+		}
+	}
+	// Calculo de la aridad, descomentar en caso de hacer el calculo
+	//std::println("Computing arity...");
+	//unsigned int arity = compute_a();
+	unsigned int arity = 62;
 	std::println("Decided on a = {}", arity);
 
 	std::println("Starting experiments");
